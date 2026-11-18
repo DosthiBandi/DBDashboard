@@ -368,3 +368,23 @@ Mac scheduler → Clover authenticated API → paginated orders, line items, pay
 
 ### Remaining hardware decision
 Confirm whether the 16 GB Mac is Apple Silicon (M-series) or Intel before locking model quantization, performance expectations and Docker resource limits.
+
+## Catering and payment-holder update — November 18, 2026
+
+- Each catering order contains multiple item rows with quantity, whole-dollar integer unit price, and a Prepared by dropdown. Item total = quantity × unit price.
+- Prepared by offers Chef, Sh, A, Md and preserves existing names. These names were confirmed by the owner; this replaces the earlier free-text form direction.
+- Daily Sales and Catering Payments display Payment held by: Owner 1, Owner 2, Zelle, Bank. Holder/account is separate from payment method. A daily summary holds one selected holder; split allocations require a separate future ledger.
+- Existing records retain unknown holders as Not recorded. Existing fractional item prices must be reviewed explicitly before converting their column to INTEGER; never round silently.
+
+
+## Dashboard catering section — November 18, 2026
+
+- Dashboard includes a separate catering panel filtered inclusively by order event date using the existing global date/range selection.
+- Show selected orders with total, amount paid, amount due and expandable item details.
+- Summary cards: order total, amount paid, amount due, Cash received, Zelle received, Bank received, and Card / other received. Group collections by payment method, independently of payment holder.
+- Amount paid and method cards include the full payment history of selected orders, including deposits outside the event-date range. This is an event-order view, not a payment-date cash-flow report.
+- Catered collections remain separate from daily sales revenue. Loading or failed catering requests show unavailable amounts, not zeros; catering failures do not hide daily sales.
+
+- Dashboard catering collections also show a holder/account breakdown (Owner 1, Owner 2, Zelle, Bank, Not recorded), with Cash, Zelle, Bank, Card/other, and total received columns. Unassigned receipts remain visible. Holder totals use the same selected event orders as the collection cards. They are recorded receipts, not current balances or a transfer ledger.
+
+- Collections by holder separates Catering cash, Daily sales cash, and Cash out. Cash out is assigned using a new `cash_out_holder` (Owner 1 / Owner 2), independent of the received-payment holder; there is no default payer and a payer must be selected when cash out is greater than zero. Existing cash-out records remain unassigned. Daily figures use business dates; catering figures use event dates. Keep the total catering-only so potentially overlapping sources are not summed automatically.

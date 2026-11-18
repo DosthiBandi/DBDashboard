@@ -18,11 +18,12 @@ async def principal(authorization: str | None = Header(default=None), db: Sessio
     token = authorization[7:]
     if settings.dev_bearer_token and settings.dev_user_id and secrets.compare_digest(token, settings.dev_bearer_token):
         return Principal(settings.dev_user_id, settings.dev_user_role)
-    if not settings.supabase_url or not settings.supabase_anon_key:
+    api_key = settings.supabase_publishable_key or settings.supabase_anon_key
+    if not settings.supabase_url or not api_key:
         raise HTTPException(401, "Authentication provider not configured")
     try:
         async with httpx.AsyncClient(timeout=8) as client:
-            response = await client.get(settings.supabase_url.rstrip("/") + "/auth/v1/user",headers={"apikey":settings.supabase_anon_key,"Authorization":f"Bearer {token}"})
+            response = await client.get(settings.supabase_url.rstrip("/") + "/auth/v1/user",headers={"apikey":api_key,"Authorization":f"Bearer {token}"})
         if response.status_code != 200:
             raise HTTPException(401, "Invalid or expired token")
         user_id = response.json().get("id")

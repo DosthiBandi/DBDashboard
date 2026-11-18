@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone, date
 from decimal import Decimal
-from sqlalchemy import String, ForeignKey, Date, DateTime, Numeric, Integer, Text, UniqueConstraint
+from sqlalchemy import String, ForeignKey, Date, DateTime, Numeric, Integer, Text, UniqueConstraint, CheckConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .db import Base
 
@@ -15,6 +15,10 @@ class Profile(Base):
 
 class DailySale(Base):
     __tablename__ = "daily_sales"
+    __table_args__ = (
+        CheckConstraint("payment_holder IS NULL OR payment_holder IN ('Owner 1', 'Owner 2', 'Zelle', 'Bank')", name="ck_daily_sales_payment_holder"),
+        CheckConstraint("cash_out_holder IS NULL OR cash_out_holder IN ('Owner 1', 'Owner 2')", name="ck_daily_sales_cash_out_holder"),
+    )
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
     business_date: Mapped[date] = mapped_column(Date, nullable=False, unique=True)
     cash_sales: Mapped[Decimal] = mapped_column(Numeric(12,2), nullable=False, default=0)
@@ -22,10 +26,12 @@ class DailySale(Base):
     digital_cash_sales: Mapped[Decimal] = mapped_column(Numeric(12,2), nullable=False, default=0)
     cash_in: Mapped[Decimal] = mapped_column(Numeric(12,2), nullable=False, default=0)
     cash_out: Mapped[Decimal] = mapped_column(Numeric(12,2), nullable=False, default=0)
+    cash_out_holder: Mapped[str | None] = mapped_column(String(20))
     cash_at_box: Mapped[Decimal | None] = mapped_column(Numeric(12,2))
     open_orders: Mapped[int | None] = mapped_column(Integer)
     closed_orders: Mapped[int | None] = mapped_column(Integer)
     amount_due: Mapped[Decimal] = mapped_column(Numeric(12,2), nullable=False, default=0)
+    payment_holder: Mapped[str | None] = mapped_column(String(20))
     notes: Mapped[str] = mapped_column(Text, default="")
     created_by: Mapped[str] = mapped_column(String(64), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
@@ -65,17 +71,19 @@ class CateringItem(Base):
     item_name: Mapped[str] = mapped_column(String(160), nullable=False)
     size: Mapped[str] = mapped_column(String(50), default="")
     quantity: Mapped[Decimal] = mapped_column(Numeric(10,2), nullable=False)
-    unit_price: Mapped[Decimal] = mapped_column(Numeric(12,2), nullable=False)
+    unit_price: Mapped[int] = mapped_column(Integer, nullable=False)
     prepared_by: Mapped[str] = mapped_column(String(120), default="")
     order: Mapped["CateringOrder"] = relationship(back_populates="items")
 
 class CateringPayment(Base):
     __tablename__ = "catering_payments"
+    __table_args__ = (CheckConstraint("payment_holder IS NULL OR payment_holder IN ('Owner 1', 'Owner 2', 'Zelle', 'Bank')", name="ck_catering_payments_payment_holder"),)
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
     order_id: Mapped[str] = mapped_column(ForeignKey("catering_orders.id"), nullable=False)
     payment_date: Mapped[date] = mapped_column(Date, nullable=False)
     amount: Mapped[Decimal] = mapped_column(Numeric(12,2), nullable=False)
     method: Mapped[str] = mapped_column(String(40), nullable=False)
+    payment_holder: Mapped[str | None] = mapped_column(String(20))
     external_reference: Mapped[str | None] = mapped_column(String(120))
     order: Mapped["CateringOrder"] = relationship(back_populates="payments")
 

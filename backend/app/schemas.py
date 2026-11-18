@@ -1,9 +1,12 @@
 from datetime import date
 from decimal import Decimal
+from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 class Model(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, validate_default=True)
+
+PaymentHolder = Literal["Owner 1", "Owner 2", "Zelle", "Bank"]
 
 class SaleIn(Model):
     business_date: date
@@ -12,10 +15,12 @@ class SaleIn(Model):
     digital_cash_sales: Decimal = Field(default=0, ge=0)
     cash_in: Decimal = Field(default=0, ge=0)
     cash_out: Decimal = Field(default=0, ge=0)
+    cash_out_holder: Literal["Owner 1", "Owner 2"] | None = None
     cash_at_box: Decimal | None = Field(default=None, ge=0)
     open_orders: int | None = Field(default=None, ge=0)
     closed_orders: int | None = Field(default=None, ge=0)
     amount_due: Decimal = Field(default=0, ge=0)
+    payment_holder: PaymentHolder | None = None
     notes: str = ""
 class SaleOut(SaleIn):
     id: str
@@ -39,12 +44,13 @@ class CateringItemIn(Model):
     item_name: str = Field(min_length=1)
     size: str = ""
     quantity: Decimal = Field(gt=0)
-    unit_price: Decimal = Field(ge=0)
-    prepared_by: str = ""
+    unit_price: int = Field(ge=0, le=2147483647)
+    prepared_by: str = Field(default="", max_length=120)
 class CateringPaymentIn(Model):
     payment_date: date
     amount: Decimal = Field(gt=0)
     method: str = Field(min_length=1)
+    payment_holder: PaymentHolder | None = None
     external_reference: str | None = None
 class CateringIn(Model):
     customer_name: str = Field(min_length=1)

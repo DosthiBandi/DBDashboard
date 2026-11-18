@@ -5,7 +5,8 @@ from .config import settings
 class Base(DeclarativeBase):
     pass
 
-engine = create_engine(settings.database_url, connect_args={"check_same_thread": False} if settings.database_url.startswith("sqlite") else {}, pool_pre_ping=True)
+connect_args = {"check_same_thread": False} if settings.database_url.startswith("sqlite") else {"connect_timeout": 8} if settings.database_url.startswith("postgresql") else {}
+engine = create_engine(settings.database_url, connect_args=connect_args, pool_pre_ping=True)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 
 def get_db():

@@ -1,15 +1,17 @@
 from datetime import date
 from decimal import Decimal
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, Query, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 from .db import get_db
 from .config import settings
-from .auth import Principal, require
+from .auth import Principal, require, principal
 from .models import DailySale, Expense, CateringOrder, CateringItem, CateringPayment
 from .schemas import SaleIn, SaleOut, ExpenseIn, ExpenseOut, CateringIn, CateringOut, CateringPaymentIn
+from .readiness import check_database, SchemaNotReady
 
 app = FastAPI(title="Dosthi Bandi Dashboard API",version="0.1.0")
 app.add_middleware(CORSMiddleware,allow_origins=[s.strip() for s in settings.cors_origins.split(",") if s.strip()],allow_methods=["GET","POST"],allow_headers=["Authorization","Content-Type"])
@@ -17,12 +19,41 @@ app.add_middleware(CORSMiddleware,allow_origins=[s.strip() for s in settings.cor
 @app.get("/health")
 def health(): return {"status":"ok","service":"dbdashboard-api"}
 
+@app.get("/health/ready")
+def readiness(db: Session = Depends(get_db)):
+    try:
+        return check_database(db.connection())
+    except SchemaNotReady as error:
+        raise HTTPException(503, str(error)) from None
+    except SQLAlchemyError:
+        raise HTTPException(503, "Cannot connect to the database. Check DATABASE_URL and database availability.") from None
+
+@app.exception_handler(SQLAlchemyError)
+async def database_error(_request: Request, _exc: SQLAlchemyError):
+    # Database exceptions can include connection credentials or customer values.
+    return JSONResponse(status_code=503, content={"detail": "Database unavailable or schema not initialized. Check backend configuration and run the database setup command."})
+
+@app.get("/api/v1/auth/config")
+def auth_config():
+    if not settings.supabase_url or not settings.supabase_publishable_key:
+        raise HTTPException(503, "Set SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY in backend/.env, then restart the API")
+    return {"url": settings.supabase_url, "publishable_key": settings.supabase_publishable_key}
+
+@app.get("/api/v1/me")
+def me(p: Principal = Depends(principal)):
+    return {"user_id": p.user_id, "role": p.role}
+
+def validate_range(start: date | None, end: date | None):
+    if start and end and start > end:
+        raise HTTPException(422, "Start date must not be after end date")
+
 def sale_out(s: DailySale):
     return SaleOut.model_validate({**{c.name:getattr(s,c.name) for c in s.__table__.columns}, "total_sales":s.cash_sales+s.card_sales+s.digital_cash_sales})
 
 @app.get("/api/v1/daily-sales",response_model=list[SaleOut])
-def sales(start:date|None=None,end:date|None=None,db:Session=Depends(get_db),_p:Principal=Depends(require("owner","manager","staff"))):
-    stmt=select(DailySale).order_by(DailySale.business_date.desc()).limit(500)
+def sales(start:date|None=None,end:date|None=None,offset:int=Query(0,ge=0),limit:int=Query(500,ge=1,le=500),db:Session=Depends(get_db),_p:Principal=Depends(require("owner","manager","staff"))):
+    validate_range(start,end)
+    stmt=select(DailySale).order_by(DailySale.business_date.desc(),DailySale.id).offset(offset).limit(limit)
     if start: stmt=stmt.where(DailySale.business_date>=start)
     if end: stmt=stmt.where(DailySale.business_date<=end)
     return [sale_out(x) for x in db.scalars(stmt)]
@@ -36,8 +67,9 @@ def create_sale(payload:SaleIn,db:Session=Depends(get_db),p:Principal=Depends(re
     db.refresh(obj);return sale_out(obj)
 
 @app.get("/api/v1/expenses",response_model=list[ExpenseOut])
-def expenses(start:date|None=None,end:date|None=None,db:Session=Depends(get_db),_p:Principal=Depends(require("owner","manager"))):
-    stmt=select(Expense).order_by(Expense.expense_date.desc()).limit(500)
+def expenses(start:date|None=None,end:date|None=None,offset:int=Query(0,ge=0),limit:int=Query(500,ge=1,le=500),db:Session=Depends(get_db),_p:Principal=Depends(require("owner","manager"))):
+    validate_range(start,end)
+    stmt=select(Expense).order_by(Expense.expense_date.desc(),Expense.id).offset(offset).limit(limit)
     if start:stmt=stmt.where(Expense.expense_date>=start)
     if end:stmt=stmt.where(Expense.expense_date<=end)
     return list(db.scalars(stmt))
@@ -52,8 +84,12 @@ def catering_out(o:CateringOrder):
     return CateringOut.model_validate({"id":o.id,"customer_name":o.customer_name,"phone":o.phone,"email":o.email,"event_date":o.event_date,"headcount":o.headcount,"status":o.status,"items":o.items,"payments":o.payments,"order_total":total,"paid_total":paid,"balance":total-paid})
 
 @app.get("/api/v1/catering",response_model=list[CateringOut])
-def catering(db:Session=Depends(get_db),_p:Principal=Depends(require("owner","manager","staff"))):
-    return [catering_out(o) for o in db.scalars(select(CateringOrder).order_by(CateringOrder.event_date.desc()).limit(200))]
+def catering(start:date|None=None,end:date|None=None,offset:int=Query(0,ge=0),limit:int=Query(500,ge=1,le=500),db:Session=Depends(get_db),_p:Principal=Depends(require("owner","manager","staff"))):
+    validate_range(start,end)
+    stmt=select(CateringOrder).order_by(CateringOrder.event_date.desc(),CateringOrder.id).offset(offset).limit(limit)
+    if start:stmt=stmt.where(CateringOrder.event_date>=start)
+    if end:stmt=stmt.where(CateringOrder.event_date<=end)
+    return [catering_out(o) for o in db.scalars(stmt)]
 
 @app.post("/api/v1/catering",response_model=CateringOut,status_code=201)
 def create_catering(payload:CateringIn,db:Session=Depends(get_db),p:Principal=Depends(require("owner","manager"))):
@@ -71,6 +107,7 @@ def add_catering_payment(order_id:str,payload:CateringPaymentIn,db:Session=Depen
 
 @app.get("/api/v1/summary")
 def summary(start:date|None=None,end:date|None=None,db:Session=Depends(get_db),_p:Principal=Depends(require("owner","manager"))):
+    validate_range(start,end)
     stmt=select(DailySale)
     if start:stmt=stmt.where(DailySale.business_date>=start)
     if end:stmt=stmt.where(DailySale.business_date<=end)

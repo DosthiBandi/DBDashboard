@@ -1,46 +1,74 @@
-import {useState} from 'react';
-import {DateRangeFilter, type DateSelection} from './DateRangeFilter';
-import {businessToday,presetRange,dateInRange} from './dateRanges';
-import {LayoutDashboard,ClipboardList,CalendarDays,ChartNoAxesCombined,Settings,Menu,Plus,X,Search,ChevronDown,Download} from 'lucide-react';
+import {useEffect,useState} from 'react';
+import type {SupabaseClient} from '@supabase/supabase-js';
+import {DateRangeFilter,type DateSelection} from './DateRangeFilter';
+import {businessToday,presetRange} from './dateRanges';
+import {LayoutDashboard,ClipboardList,CalendarDays,ChartNoAxesCombined,Settings,Menu,Plus,Search} from 'lucide-react';
+import {AuthGate} from './AuthGate';
+import {allRecords,request,money,sumMoney,type Sale,type Expense,type CateringOrder,type Role} from './api';
+import {RecordForm,type RecordKind} from './RecordForm';
+import {CateringOrders,filterOrders} from './CateringOrders';
+import {CateringDashboard} from './CateringDashboard';
+
 type Section='Overview'|'Operations'|'Catering'|'Insights'|'Settings';
 const sections:Section[]=['Overview','Operations','Catering','Insights','Settings'];
 const icons=[LayoutDashboard,ClipboardList,CalendarDays,ChartNoAxesCombined,Settings];
 const tabs:Record<Section,string[]>={Overview:['Dashboard','Daily Sales','Cash','Daily Close'],Operations:['Orders','Expenses','Inventory'],Catering:['Orders','Payments'],Insights:['Reports','P&L','Exports'],Settings:['Integrations','WhatsApp','Clover','Users']};
-const samples:Record<string,{headers:string[],rows:string[][]}>={
-'Daily Sales':{headers:['Date','Cash','Card','Digital','Total','Status'],rows:[['Nov 13','$620','$920','$310','$1,850','Open'],['Nov 12','$480','$1,090','$80','$1,650','Closed']]},
-'Orders':{headers:['Order ID','Customer / Type','Date','Items','Amount','Status'],rows:[['C-1045','Walk-in','Nov 13','2','$31.98','Paid'],['C-1044','Takeaway','Nov 13','3','$46.50','Paid']]},
-'Expenses':{headers:['Date','Vendor','Category','Method','Amount','Receipt'],rows:[['Nov 13','Costco','Groceries','Card','$185.00','Attached'],['Nov 12','Restaurant Depot','Groceries','Card','$324.20','Attached']]},
-'Inventory':{headers:['Date','Item','Supplier','Quantity','Cost','Source'],rows:[['Nov 13','Vegetables','Costco','12 lb','$185','Expense'],['Nov 12','Rice bags','Restaurant Depot','2 bags','$86','Expense']]},
-'Cash':{headers:['Date','Movement','Reason','Amount','Entered by','Status'],rows:[['Nov 13','Cash in','Change added','+$75','Manager','Verified'],['Nov 13','Cash out','Supplies','-$15','Manager','Verified']]},
-'Daily Close':{headers:['Check','Expected','Actual','Variance','Owner','Status'],rows:[['Cash at box','$930','$925','-$5','Manager','Review'],['Clover card','$920','$920','$0','System','Matched']]},
-'Payments':{headers:['Customer','Order total','Deposit','Balance','Due date','Status'],rows:[['ABC Corporate','$850','$250','$600','Nov 14','Pending']]},
-'Reports':{headers:['Metric','This month','Previous','Change'],rows:[['Sales','$38,420','$36,100','+6.4%'],['Cash','$10,840','$10,320','+5.0%']]},
-'P&L':{headers:['Category','Amount','Data quality'],rows:[['Revenue','Not reconciled','Incomplete'],['Food cost','Missing records','Incomplete'],['Labor','Missing payroll','Incomplete']]},
-'Exports':{headers:['Dataset','Range','Format','Access'],rows:[['Daily sales','Nov 2026','CSV / XLSX','Owner only']]},
-'Integrations':{headers:['Service','Runtime','Last checked','Status'],rows:[['Supabase','Cloud','Not connected','Setup required'],['Ollama','Mac 16GB','Not connected','Setup required']]},
-'WhatsApp':{headers:['Received','Message','Category','Review'],rows:[['Demo','Paid $185 at Costco','Expense','Pending']]},
-'Clover':{headers:['Job','Records','Last run','Status'],rows:[['Orders sync','—','Never','Not configured']]},
-'Users':{headers:['Role','Sales','Expenses','Financial exports'],rows:[['Owner','Full','Full','Allowed'],['Manager','Edit','Create','Restricted'],['Staff','View','Restricted','Blocked']]}
-};
-const catering={headers:['Customer','Event date','Guests','Order total','Deposit','Status'],rows:[['ABC Corporate Lunch','Nov 14','50','$850','$250','Confirmed'],['Team Lunch','Nov 16','30','$420','$0','New']]};
-// Illustrative sales entries; this is not live Clover or Supabase data.
-const demoSales=[
-{date:'2026-11-13',cash:620,card:920,digital:310},
-{date:'2026-11-12',cash:480,card:1090,digital:80}
-];
-const currency=(amount:number)=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0}).format(amount);
-export default function App(){const[section,setSection]=useState<Section>('Overview');const[tab,setTab]=useState('Dashboard');const[drawer,setDrawer]=useState(false);const[menu,setMenu]=useState(false);const[query,setQuery]=useState('');const[dateSelection,setDateSelection]=useState<DateSelection>(()=>({preset:'thisMonth',range:presetRange('thisMonth',businessToday())}));
-function go(s:Section){setSection(s);setTab(tabs[s][0]);setMenu(false)}
-const dataset=section==='Catering'&&tab==='Orders'?catering:samples[tab];
-const rows=(dataset?.rows||[]).filter(row=>{
- if(!row.join(' ').toLowerCase().includes(query.toLowerCase()))return false;
- if(section==='Overview'&&tab==='Daily Sales'){
-  const hit=/^Nov (\d+)/.exec(row[0]);
-  return hit?dateInRange('2026-11-'+hit[1].padStart(2,'0'),dateSelection.range):true;
- }
- return true;
-});
-const visibleSales=demoSales.filter(s=>dateInRange(s.date,dateSelection.range));
-const totals=visibleSales.reduce((a,s)=>({cash:a.cash+s.cash,card:a.card+s.card,digital:a.digital+s.digital}),{cash:0,card:0,digital:0});
-const cards=[['Total Sales',currency(totals.cash+totals.card+totals.digital)],['Cash',currency(totals.cash)],['Card',currency(totals.card)],['Digital Cash',currency(totals.digital)],['Catering','—'],['Cash In / Out','—']];
-return <div className="app"><aside className={'sidebar '+(menu?'show':'')}><div className="brand">Dosthi <b>Bandi</b><small>RESTAURANT OPERATIONS</small></div><div className="nav-caption">WORKSPACE</div><nav>{sections.map((s,i)=>{const Icon=icons[i];return <button key={s} className={'nav-item '+(section===s?'active':'')} onClick={()=>go(s)}><Icon size={18}/>{s}</button>})}</nav><div className="sidebar-bottom">Help & support <span>Owner workspace</span></div></aside><main><header className="top"><button className="hamburger" onClick={()=>setMenu(!menu)}><Menu/></button><div><div className="breadcrumb">Dosthi Bandi / {section}</div><h1>{section==='Overview'?'Restaurant overview':section}</h1></div><div className="top-actions">{section==='Overview'&&<DateRangeFilter value={dateSelection} onChange={setDateSelection}/>}<button className="avatar">DB</button></div></header><div className="content">{section==='Overview'&&<p className="demo-banner">Preview data only. The date range filters example sales records; live data is not connected.</p>}<div className="tabs">{tabs[section].map(t=><button key={t} className={tab===t?'selected':''} onClick={()=>{setTab(t);setQuery('')}}>{t}</button>)}</div>{section==='Overview'&&tab==='Dashboard'?<><div className="stats">{cards.map(([name,value])=><div className="stat" key={name}><span>{name}</span><strong>{value}</strong><small>{visibleSales.length?'Illustrative demo data':'No demo entries in range'}</small></div>)}</div><div className="two-col"><section className="panel"><div className="panel-heading"><h2>Sales overview</h2><span>Illustrative sales in selected range</span></div><div className="chart">{visibleSales.length ? [...visibleSales].reverse().map(s=><div key={s.date}><span style={{height:Math.max(6,(s.cash+s.card+s.digital)/2000*100)+'%'}}></span><small>{s.date.slice(5)}</small></div>) : <p className="no-range-data">No demo sales records for this date range.</p>}</div></section><section className="panel"><div className="panel-heading"><h2>Recent activity</h2></div><div className="activity"><p>Cash reconciliation <em>Review required</em></p><p>Clover sync <em>Not connected</em></p><p>WhatsApp processing <em>Not connected</em></p></div></section></div></>:<section className="panel"><div className="panel-heading"><div><h2>{section==='Catering'?'Catering '+tab:tab}</h2><p>Illustrative records — no production database connected</p></div><div className="tools"><label className="search"><Search size={15}/><input placeholder="Search records" value={query} onChange={e=>setQuery(e.target.value)}/></label><button className="primary" onClick={()=>setDrawer(true)}><Plus size={16}/>New record</button></div></div><div className="table-wrap"><table><thead><tr>{(dataset?.headers||[]).map(h=><th key={h}>{h} <ChevronDown size={12}/></th>)}</tr></thead><tbody>{rows.map((row,i)=><tr key={i}>{row.map((v,j)=><td key={j}>{j===row.length-1?<span className="status">{v}</span>:v}</td>)}</tr>)}</tbody></table>{!dataset&&<div className="empty">This section is planned for a later implementation milestone.</div>}{dataset&&rows.length===0&&<div className="empty">No matching records</div>}</div><footer className="table-footer">Showing {rows.length} demo records <button disabled><Download size={14}/> Export (coming later)</button></footer></section>}</div></main>{drawer&&<div className="overlay" onClick={()=>setDrawer(false)}><div className="drawer" onClick={e=>e.stopPropagation()}><div className="drawer-head"><h2>New {section==='Catering'?'catering order':tab==='Expenses'?'expense':'record'}</h2><button onClick={()=>setDrawer(false)}><X/></button></div><p>Form preview only. Saving is disabled until authentication, validation, and the database are connected.</p><form onSubmit={e=>e.preventDefault()}>{(section==='Catering'?['Customer name','Phone','Event date','Headcount','Menu items','Deposit']:tab==='Expenses'?['Date','Vendor','Category','Amount','Payment method','Notes']:['Date','Amount','Payment method','Notes']).map(f=><label key={f}>{f}<input placeholder={f}/></label>)}<button type="button" className="primary" disabled>Save (not connected)</button></form></div></div>}</div>}
+type Dataset={headers:string[];rows:string[][]};
+const unavailable:Record<string,string>={Orders:'Clover orders are not connected yet.',Inventory:'Inventory records are not implemented yet.','Daily Close':'Daily closing and cash reconciliation are not implemented yet.',Reports:'Reporting is not implemented yet.','P&L':'P&L requires reconciled costs and is not available yet.',Exports:'Exports are not implemented yet.',Integrations:'The app uses the configured API database. Clover and WhatsApp integrations are not connected.',WhatsApp:'WhatsApp ingestion is not connected.',Clover:'Clover synchronization is not connected.',Users:'User management is not available in the app. An administrator must provision accounts.'};
+
+export default function App(){return <AuthGate>{(client,session)=><Workspace key={session.user.id} client={client}/>}</AuthGate>;}
+function Workspace({client}:{client:SupabaseClient}) {
+  const [section,setSection]=useState<Section>('Overview'),[tab,setTab]=useState('Dashboard');
+  const [drawer,setDrawer]=useState<RecordKind|null>(null),[menu,setMenu]=useState(false),[query,setQuery]=useState('');
+  const [dateSelection,setDateSelection]=useState<DateSelection>(()=>({preset:'thisMonth',range:presetRange('thisMonth',businessToday())}));
+  const [role,setRole]=useState<Role|null>(null),[roleError,setRoleError]=useState('');
+  const [sales,setSales]=useState<Sale[]>([]),[expenses,setExpenses]=useState<Expense[]>([]),[orders,setOrders]=useState<CateringOrder[]>([]);
+  const [loading,setLoading]=useState(true),[error,setError]=useState(''),[revision,setRevision]=useState(0),[notice,setNotice]=useState('');
+  const canWrite=role==='owner'||role==='manager';
+  const needsSales=section==='Overview'&&['Dashboard','Daily Sales','Cash'].includes(tab);
+  const needsExpenses=section==='Operations'&&tab==='Expenses';
+  const needsCatering=section==='Catering';
+  const restricted=(needsExpenses&&!canWrite)||(section==='Insights'&&role!=='owner')||(section==='Settings'&&role!=='owner');
+  useEffect(()=>{
+    const controller=new AbortController();setRoleError('');
+    request<{role:Role}>('/api/v1/me',client,{signal:controller.signal}).then(me=>setRole(me.role)).catch(e=>{if(!controller.signal.aborted){setRoleError(e.message);setLoading(false);}});
+    return ()=>controller.abort();
+  },[client,revision]);
+  useEffect(()=>{
+    const controller=new AbortController();
+    setSales([]);setExpenses([]);setOrders([]);setError('');
+    if(!role)return ()=>controller.abort();
+    if(restricted||!(needsSales||needsExpenses||needsCatering)){setLoading(false);return ()=>controller.abort();}
+    setLoading(true);
+    const range=new URLSearchParams(dateSelection.range).toString();
+    const load=needsSales?allRecords<Sale>(`/api/v1/daily-sales?${range}`,client,controller.signal).then(setSales):needsExpenses?allRecords<Expense>(`/api/v1/expenses?${range}`,client,controller.signal).then(setExpenses):allRecords<CateringOrder>('/api/v1/catering',client,controller.signal).then(setOrders);
+    load.catch(e=>{if(!controller.signal.aborted)setError(e.message);}).finally(()=>{if(!controller.signal.aborted)setLoading(false);});
+    return ()=>controller.abort();
+  },[client,role,restricted,needsSales,needsExpenses,needsCatering,dateSelection.range.start,dateSelection.range.end,revision]);
+  function go(next:Section){setSection(next);setTab(tabs[next][0]);setMenu(false);setQuery('');setNotice('');}
+  async function signOut(){const {error}=await client.auth.signOut();if(error)setNotice('Sign-out failed. Please try again.');}
+  const ready=!!role&&!loading&&!error&&!roleError;
+  const totals={cash:sumMoney(sales.map(s=>s.cash_sales)),card:sumMoney(sales.map(s=>s.card_sales)),digital:sumMoney(sales.map(s=>s.digital_cash_sales)),sales:sumMoney(sales.map(s=>s.total_sales)),cashNet:sumMoney(sales.flatMap(s=>[s.cash_in,-Number(s.cash_out)]))};
+  const cards=[['Total Sales',totals.sales],['Cash Sales',totals.cash],['Card Sales',totals.card],['Digital Cash Sales',totals.digital],['Cash In / Out (net)',totals.cashNet]] as const;
+  let dataset:Dataset|undefined;
+  if(needsSales&&tab==='Daily Sales')dataset={headers:['Date','Cash sales','Card sales','Digital sales','Total sales','Cash out','Cash out paid by','Due recorded','Payment held by','Notes'],rows:sales.map(s=>[s.business_date,money(s.cash_sales),money(s.card_sales),money(s.digital_cash_sales),money(s.total_sales),money(s.cash_out),s.cash_out_holder||'Not recorded',money(s.amount_due),s.payment_holder||'Not recorded',s.notes||'—'])};
+  if(needsSales&&tab==='Cash')dataset={headers:['Date','Cash sales','Other cash in','Cash out','Cash out paid by','Counted cash at box','Notes'],rows:sales.map(s=>[s.business_date,money(s.cash_sales),money(s.cash_in),money(s.cash_out),s.cash_out_holder||'Not recorded',s.cash_at_box===null?'Not counted':money(s.cash_at_box),s.notes||'—'])};
+  if(needsExpenses)dataset={headers:['Date','Vendor','Category','Method','Amount','Receipt','Notes'],rows:expenses.map(e=>[e.expense_date,e.vendor,e.category,e.payment_method,money(e.amount),e.receipt_path?'Recorded; preview unavailable':'No receipt',e.notes||'—'])};
+  if(needsCatering&&tab==='Orders')dataset={headers:['Customer','Event date','Guests','Order total','Paid','Balance','Status'],rows:orders.map(o=>[o.customer_name,o.event_date,String(o.headcount),money(o.order_total),money(o.paid_total),money(o.balance),o.status])};
+  if(needsCatering&&tab==='Payments')dataset={headers:['Customer','Payment date','Method','Amount','Payment held by'],rows:orders.flatMap(o=>o.payments.map(p=>[o.customer_name,p.payment_date,p.method,money(p.amount),p.payment_holder||'Not recorded']))};
+  const visibleOrderCount=filterOrders(orders,query).length;
+  const rows=(dataset?.rows||[]).filter(row=>row.join(' ').toLowerCase().includes(query.toLowerCase()));
+  const newKind:RecordKind|null=section==='Overview'&&['Dashboard','Daily Sales','Cash'].includes(tab)?'sale':needsExpenses?'expense':needsCatering?(tab==='Orders'?'catering':'payment'):null;
+  const maxSales=Math.max(1,...sales.map(s=>Number(s.total_sales)));
+  return <div className="app"><aside className={'sidebar '+(menu?'show':'')}><div className="brand">Dosthi <b>Bandi</b><small>RESTAURANT OPERATIONS</small></div><div className="nav-caption">WORKSPACE</div><nav>{sections.map((s,i)=>{const Icon=icons[i];return <button key={s} className={'nav-item '+(section===s?'active':'')} onClick={()=>go(s)}><Icon size={18}/>{s}</button>;})}</nav><div className="sidebar-bottom">{role?`${role} workspace`:'Checking access…'}<button className="sign-out" onClick={signOut}>Sign out</button></div></aside>
+  <main><header className="top"><button className="hamburger" aria-label="Toggle navigation" onClick={()=>setMenu(!menu)}><Menu/></button><div><div className="breadcrumb">Dosthi Bandi / {section}</div><h1>{section==='Overview'?'Restaurant overview':section}</h1></div><div className="top-actions">{(section==='Overview'||needsExpenses)&&<DateRangeFilter value={dateSelection} onChange={setDateSelection}/>}<button className="mobile-sign-out" onClick={signOut}>Sign out</button></div></header>
+  <div className="content"><div className="connection-banner">Database records via API · {role||'Checking access'}</div>{notice&&<p role="status">{notice}</p>}<div className="tabs">{tabs[section].map(t=><button key={t} className={tab===t?'selected':''} onClick={()=>{setTab(t);setQuery('');setNotice('');}}>{t}</button>)}</div>
+    {(error||roleError)&&<div className="error-message" role="alert"><p>{roleError||error}</p><button onClick={()=>setRevision(x=>x+1)}>Retry</button></div>}
+    {loading&&!roleError&&<p role="status">Loading database records…</p>}
+    {restricted&&role&&<section className="panel empty">This section is not available for your role.</section>}
+    {!restricted&&section==='Overview'&&tab==='Dashboard'?<><div className="dashboard-actions">{canWrite&&ready&&<button className="primary" onClick={()=>setDrawer('sale')}><Plus size={16}/>New Daily Sale</button>}</div><div className="stats">{cards.map(([name,value])=><div className="stat" key={name}><span>{name}</span><strong>{ready?money(value):'—'}</strong><small>{ready?`${sales.length} recorded days in selected range`:'Data unavailable'}</small></div>)}</div><p className="demo-banner">Totals include recorded days only; missing days are not assumed to have zero sales. Catering payments and dues are tracked separately.</p><div className="two-col"><section className="panel"><div className="panel-heading"><h2>Sales overview</h2><span>Recorded sales in selected range</span></div><div className="chart">{ready&&sales.length?[...sales].reverse().map(s=><div key={s.id} title={`${s.business_date}: ${money(s.total_sales)}`}><span style={{height:Math.max(1,Number(s.total_sales)/maxSales*100)+'%'}}/><small>{s.business_date.slice(5)}</small></div>):<p className="no-range-data">{ready?'No sales records in this range.':'Sales data unavailable.'}</p>}</div></section><section className="panel"><div className="panel-heading"><h2>Integrations & reconciliation</h2></div><div className="activity"><p>Cash reconciliation <em>Not implemented</em></p><p>Clover sync <em>Not connected</em></p><p>WhatsApp processing <em>Not connected</em></p></div></section></div>{role&&<CateringDashboard key={`${dateSelection.range.start}:${dateSelection.range.end}:${revision}`} client={client} range={dateSelection.range} sales={sales} salesLoading={loading} salesError={error||roleError}/>}</>:
+    !restricted&&<section className="panel"><div className="panel-heading"><div><h2>{section==='Catering'?'Catering '+tab:tab}</h2><p>{dataset?'Records from the configured database':'Feature status'}</p></div><div className="tools">{dataset&&<label className="search"><Search size={15}/><input aria-label="Search records" placeholder="Search records" value={query} onChange={e=>setQuery(e.target.value)}/></label>}{canWrite&&newKind&&ready&&<button className="primary" onClick={()=>setDrawer(newKind)}><Plus size={16}/>{newKind==='payment'?'Record payment':'New record'}</button>}</div></div>
+      {dataset&&ready?<>{needsCatering&&tab==='Orders'?<CateringOrders orders={orders} query={query}/>:<div className="table-wrap"><table><thead><tr>{dataset.headers.map(h=><th key={h}>{h}</th>)}</tr></thead><tbody>{rows.map((row,i)=><tr key={i}>{row.map((v,j)=><td className={dataset!.headers[j]==='Notes'?'notes-cell':''} data-label={dataset!.headers[j]} key={j}>{v}</td>)}</tr>)}</tbody></table>{rows.length===0&&<div className="empty">{query?'No matching records.':'No records yet.'}</div>}</div>}<footer className="table-footer">Showing {needsCatering&&tab==='Orders'?visibleOrderCount:rows.length} records{needsCatering?' · All event dates':''}</footer></>:!dataset&&<div className="empty">{unavailable[tab]||'This feature is not implemented yet.'}</div>}
+    </section>}
+  </div></main>{drawer&&<RecordForm kind={drawer} client={client} orders={orders} onClose={()=>setDrawer(null)} onSaved={()=>{setDrawer(null);setNotice('Record saved.');setRevision(x=>x+1);}}/>}</div>;
+}
