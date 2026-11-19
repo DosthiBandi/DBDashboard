@@ -26,3 +26,40 @@
 .dashboard-catering{margin-top:24px}.catering-summary-note{padding:0 24px;margin:0 0 20px;color:#626875;font-size:12px;line-height:1.7}.catering-stats{padding:0 24px 24px;grid-template-columns:repeat(4,minmax(0,1fr))}.catering-stats .stat{padding:18px}.catering-stats .stat strong{font-size:24px}.catering-state{padding:0 24px;color:#626875}.dashboard-catering>.error-message{margin:0 24px 20px}
 @media(max-width:1100px){.catering-stats{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(max-width:800px){.catering-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:650px){.catering-stats{padding:0 15px 18px}.catering-stats .stat{padding:13px}.catering-stats .stat strong{font-size:21px}.catering-summary-note{padding:0 18px}.dashboard-catering .panel-heading{gap:8px}}
 .holder-breakdown{border-top:1px solid #e4e7ed}.holder-breakdown h3{font-size:16px;margin:0}.holder-breakdown tfoot td{font-weight:650;background:#f6f4fa}.holder-breakdown td:not(:first-child){font-variant-numeric:tabular-nums}
+
+/* Dashboard vNext: understated two-column sales + catering summary */
+.dashboard-summary-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:stretch}
+.dashboard-summary-grid>.panel{margin:0;min-width:0;padding-bottom:17px}
+.dashboard-summary-single>.panel{margin-top:0}
+.dashboard-summary-grid .panel-heading{padding:20px 20px 14px;align-items:center}
+.dashboard-summary-grid .panel-heading h2{font-size:18px;letter-spacing:-.3px}
+.dashboard-summary-grid .panel-heading p{margin-top:5px}
+.daily-sales-total,.catering-order-total{background:#f3f0f8;color:#37313f;border-radius:9px;padding:12px 14px;text-align:right;font-size:14px;white-space:nowrap}
+.catering-order-total{background:#f7f5f2}
+.dashboard-summary-grid .stats{padding:0 16px;gap:9px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}
+.dashboard-summary-grid .stat{min-width:0;min-height:89px;background:#fafafb;border:1px solid #edeef0;border-radius:10px;padding:14px 11px;gap:10px}
+.dashboard-summary-grid .stat span{font-size:11px;color:#727884;line-height:1.4}
+.dashboard-summary-grid .stat strong{font-size:19px;line-height:1.25;letter-spacing:-.4px;font-variant-numeric:tabular-nums}
+.dashboard-summary-grid .catering-stats .stat:nth-child(5){background:#f7f5fa}
+.dashboard-summary-grid .catering-stats{padding-bottom:0}
+.dashboard-secondary-grid{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(220px,.87fr) minmax(240px,1fr);gap:16px;margin-top:18px}
+.dashboard-secondary-grid>.panel{margin:0;min-width:0}
+.dashboard-secondary-grid .panel-heading{padding:20px 20px 12px}
+.dashboard-secondary-grid .panel-heading h2{font-size:16px}
+.dashboard-secondary-grid .chart{height:245px;padding:10px 20px 22px}
+.dashboard-secondary-grid .activity{padding:0 20px 18px}
+.dashboard-secondary-grid .activity p{display:flex;gap:9px;justify-content:space-between;align-items:center;line-height:1.5}
+.dashboard-secondary-grid .activity em{float:none;color:#756c90;background:#f5f3f9;padding:5px 7px;border-radius:7px;text-align:right}
+.summary-rows{padding:0 18px 19px}
+.summary-rows>div{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 0;border-bottom:1px solid #f0f0f2;font-size:12px}
+.summary-rows>div strong{font-size:13px;font-variant-numeric:tabular-nums}
+.dashboard-holder-section,.dashboard-recent-orders{margin-top:18px}
+.dashboard-holder-section .panel-heading,.dashboard-recent-orders .panel-heading{padding:20px 22px 12px}
+.dashboard-holder-section .catering-summary-note{margin-top:0;padding:0 22px}
+.dashboard-holder-section table{min-width:1010px}
+.dashboard-holder-section th,.dashboard-holder-section td{padding:13px 14px}
+.dashboard-recent-orders .empty{padding:26px}
+.dashboard-footnote{font-size:12px;line-height:1.55;color:#747b87;margin:13px 0 6px}
+@media(max-width:1320px){.dashboard-summary-grid{grid-template-columns:1fr}.dashboard-secondary-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.dashboard-secondary-grid .sales-chart-panel{grid-column:1/-1}}
+@media(max-width:800px){.dashboard-secondary-grid{grid-template-columns:1fr}.dashboard-secondary-grid .sales-chart-panel{grid-column:auto}}
+@media(max-width:650px){.dashboard-summary-grid .stats{grid-template-columns:repeat(2,minmax(0,1fr))}.dashboard-summary-grid .stat strong{font-size:18px}.dashboard-summary-grid .panel-heading{flex-wrap:wrap}.daily-sales-total,.catering-order-total{text-align:left}.dashboard-holder-section table{min-width:0}}
